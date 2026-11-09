@@ -1,0 +1,8 @@
+id,app,app_type,permission,timing,label_lists_it,normal_for_type,concerns,rating,level,reference_answer,used_in_study
+S1,Torch Lite,Flashlight,contacts,only while in use,no,no,2,Probably unnecessary (red),Full stop,Deny,yes
+S2,City Maps,Maps,location,only while in use,yes,yes,0,Expected (green),Quiet,Allow while using,yes (card shown wrong: red)
+S3,ChatNow,Messaging,microphone,only while in use,yes,yes,0,Expected (green),Quiet,Allow while using,yes
+S4,SnapEdit,Photo editor,location,all the time,yes,no,2,Probably unnecessary (red),Full stop,Deny,yes
+S5,Calc Pro,Calculator,microphone,only while in use,no,no,2,Probably unnecessary (red),Full stop,Deny,yes (card shown wrong: green)
+S6,VideoHello,Video call,camera,only while in use,yes,yes,0,Expected (green),Quiet,Allow while using,yes
+X,Puzzle Quest,Game,location,only while in use,yes,no,1,Worth a second look (orange),Gentle pause,Review,no (extra demo)

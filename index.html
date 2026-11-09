@@ -1,0 +1,267 @@
+<title>PermissionGuard Demo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: presenter controls and "behind the scenes" panel on the left, one phone on the right; stacks on narrow screens. */
+:root{
+  --font-body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --bg:#eef1f4; --surface:#ffffff; --fg:#14202b; --muted:#4b5b69; --line:#cfd8df; --accent:#0b5fa5; --accent-fg:#ffffff;
+  --good:#17703a; --good-bg:#e3f3e8; --warn:#9a4d00; --warn-bg:#fdecd3; --bad:#b3261e; --bad-bg:#fbe3e1;
+  /* the phone screen looks the same in both themes, like a real device */
+  --ph-bg:#f7f8fa; --ph-fg:#14202b; --ph-muted:#55636f; --ph-line:#d5dce2; --ph-body:#2a3946; --ph-frame:#1b242c;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1418; --surface:#182026; --fg:#e6ecf1; --muted:#9db0bf; --line:#2b3741; --accent:#6fb3ef; --accent-fg:#0b1a28;
+  --good:#6fd08e; --good-bg:#14301d; --warn:#f0a24d; --warn-bg:#35240e; --bad:#ff8f86; --bad-bg:#3a1714; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1418; --surface:#182026; --fg:#e6ecf1; --muted:#9db0bf; --line:#2b3741; --accent:#6fb3ef; --accent-fg:#0b1a28;
+  --good:#6fd08e; --good-bg:#14301d; --warn:#f0a24d; --warn-bg:#35240e; --bad:#ff8f86; --bad-bg:#3a1714; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:16px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px}
+.wrap{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:32px;align-items:start}
+@media (max-width:860px){.wrap{grid-template-columns:minmax(0,1fr)}.phonecol{order:-1}}
+h1{font-size:1.9rem;line-height:1.15;margin:0 0 6px;text-wrap:balance}
+h2{font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;font-family:var(--font-mono);color:var(--muted);margin:0 0 10px;font-weight:500}
+.lead{color:var(--muted);margin:0 0 22px;max-width:60ch}
+.block{margin-bottom:22px}
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.seg button,.scn button{font:inherit;color:var(--fg);background:var(--surface);border:1.5px solid var(--line);border-radius:8px;padding:10px 14px;cursor:pointer;min-height:44px;text-align:left}
+.seg button[aria-pressed="true"],.scn button[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);font-weight:700}
+.scn{display:grid;gap:8px}
+.scn button{display:flex;gap:12px;align-items:center;width:100%}
+.scn .id{font-family:var(--font-mono);font-size:.8rem;color:var(--muted);min-width:2ch}
+.scn .dot{width:12px;height:12px;border-radius:50%;flex:none;border:2px solid var(--line)}
+.tag{font-family:var(--font-mono);font-size:.72rem;padding:2px 7px;border-radius:5px;border:1px solid var(--line);color:var(--muted);margin-left:auto;white-space:nowrap}
+.tag.wrongtag{color:var(--bad);border-color:var(--bad)}
+.check{display:flex;gap:10px;align-items:flex-start;margin-top:10px}
+.check input{width:22px;height:22px;margin-top:2px;flex:none;accent-color:var(--accent)}
+button:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0 0 14px;font-size:.95rem}
+.facts dt{color:var(--muted)} .facts dd{margin:0;font-weight:700}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.steps li{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:baseline;padding-top:8px;border-top:1px solid var(--line)}
+.steps b{font-family:var(--font-mono);font-size:.74rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);font-weight:500}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-weight:700;font-size:.9rem}
+.pill.good{background:var(--good-bg);color:var(--good)} .pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.bad{background:var(--bad-bg);color:var(--bad)}
+.note{color:var(--muted);font-size:.9rem;margin-top:10px}
+
+/* phone */
+.phonecol{position:sticky;top:16px}
+@media (max-width:860px){.phonecol{position:static}}
+.phone{width:340px;max-width:100%;margin:0 auto;background:var(--ph-frame);border-radius:38px;padding:12px}
+.screen{position:relative;height:640px;background:var(--ph-bg);color:var(--ph-fg);border-radius:28px;overflow:hidden;display:flex;flex-direction:column}
+.status{display:flex;justify-content:space-between;padding:10px 20px 0;font-size:.78rem;color:var(--ph-muted);font-family:var(--font-mono)}
+.app{flex:1;padding:22px 20px;display:flex;flex-direction:column;gap:14px}
+.appicon{width:56px;height:56px;border-radius:14px;background:var(--ph-frame);color:#fff;display:grid;place-items:center;font-weight:700;font-size:1.5rem}
+.appname{font-size:1.3rem;font-weight:700;margin:0}
+.appcat{color:var(--ph-muted);margin:0;font-size:.95rem}
+.ghost{height:12px;border-radius:6px;background:var(--ph-line)}
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end}
+.dim{position:absolute;inset:0;background:rgba(10,16,22,.45)}
+.sheet{position:relative;background:#fff;color:var(--ph-fg);border-radius:22px 22px 0 0;padding:20px 18px 22px;display:grid;gap:12px}
+.sheet.quiet{border-radius:16px;margin:0 12px 14px;padding:14px 14px 14px;border:2px solid var(--good);gap:10px}
+.sheet.pause{border-top:8px solid var(--warn)}
+.sheet.stop{position:absolute;inset:0;border-radius:0;border-top:0;align-content:start;grid-auto-rows:min-content;padding:0 0 22px}
+.band{display:flex;gap:12px;align-items:center;padding:18px 18px;font-weight:700;font-size:1.15rem}
+.band svg{flex:none}
+.stop .band{background:#b3261e;color:#fff;padding-top:36px;font-size:1.3rem}
+.pause .band{padding:0;color:#9a4d00}
+.quiet .band{padding:0;color:#17703a;font-size:1.05rem}
+.inner{padding:0 18px;display:grid;gap:12px}
+.quiet .inner,.pause .inner{padding:0}
+.reason{font-size:1.2rem;line-height:1.3;margin:0;font-weight:700;color:var(--ph-fg)}
+.quiet .reason{font-size:1rem;font-weight:400}
+.risk{margin:0;color:var(--ph-body);font-size:1rem}
+.btns{display:grid;gap:8px}
+.btn{font:inherit;font-size:1.05rem;font-weight:700;min-height:52px;border-radius:12px;border:2px solid transparent;cursor:pointer;padding:10px 14px;width:100%}
+.btn.pri{background:#0b5fa5;color:#fff}
+.btn.pri.danger{background:#b3261e}
+.btn.pri.good{background:#17703a}
+.btn.sec{background:#fff;color:#0b5fa5;border-color:#0b5fa5}
+.btn.ter{background:transparent;color:#34424f;font-weight:400;min-height:44px;text-decoration:underline}
+.btn:focus-visible,.link:focus-visible{outline:3px solid #0b5fa5;outline-offset:2px}
+.link{font:inherit;background:none;border:0;color:#0b5fa5;text-decoration:underline;cursor:pointer;padding:8px 0;min-height:44px;text-align:left}
+.links{display:flex;gap:18px;flex-wrap:wrap}
+.why{background:#f1f4f7;border-radius:12px;padding:12px;display:grid;gap:8px;font-size:.98rem;color:var(--ph-fg)}
+.why p{margin:0;display:grid;grid-template-columns:22px 1fr;gap:8px}
+.why .src{color:var(--ph-muted);font-size:.85rem;grid-template-columns:1fr}
+.ok{color:#17703a;font-weight:700}.no{color:#b3261e;font-weight:700}
+.dialog{position:relative;background:#fff;color:#1d1b20;margin:0 22px 160px;border-radius:26px;padding:22px 22px 14px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+.overlay.center{justify-content:center}
+.dialog p{margin:0 0 16px;font-size:1.02rem;line-height:1.35}
+.dialog .row{display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap}
+.dialog button{font:inherit;color:#0b57d0;background:none;border:0;padding:10px 12px;min-height:44px;border-radius:20px;cursor:pointer;font-weight:700}
+.result{position:absolute;left:12px;right:12px;bottom:14px;background:#fff;border:2px solid var(--ph-frame);border-radius:16px;padding:14px;display:grid;gap:8px;color:var(--ph-fg)}
+.result p{margin:0}
+.toast{position:absolute;left:12px;right:12px;top:44px;background:#14202b;color:#fff;padding:10px 14px;border-radius:12px;font-size:.95rem}
+@media (prefers-reduced-motion:no-preference){.sheet,.dialog{animation:rise .25s ease-out}@keyframes rise{from{transform:translateY(14px);opacity:.4}to{transform:none;opacity:1}}}
+</style>
+
+<div class="wrap">
+  <main>
+    <h1>PermissionGuard</h1>
+    <p class="lead">A prototype of an intelligent permission pop-up for adults who are not comfortable with technology. Pick a scenario. The phone shows what the user sees. The panel below shows what the system senses and decides.</p>
+
+    <div class="block">
+      <h2>What the phone shows</h2>
+      <div class="seg" id="modeSeg" role="group" aria-label="Pop-up type">
+        <button type="button" data-mode="pg" aria-pressed="true">PermissionGuard</button>
+        <button type="button" data-mode="regular" aria-pressed="false">Regular Android pop-up</button>
+      </div>
+      <div class="check"><input type="checkbox" id="wrongToggle"><label for="wrongToggle"><b>Study mode:</b> show the 2 wrong ratings on purpose (S2 and S5)</label></div>
+    </div>
+
+    <div class="block">
+      <h2>User setting</h2>
+      <div class="seg" id="detailSeg" role="group" aria-label="Detail level">
+        <button type="button" data-detail="short" aria-pressed="true">Short</button>
+        <button type="button" data-detail="more" aria-pressed="false">More detail</button>
+      </div>
+    </div>
+
+    <div class="block">
+      <h2>Scenario (the app asks for a permission)</h2>
+      <div class="scn" id="scnList"></div>
+    </div>
+
+    <div class="block panel" aria-live="polite">
+      <h2>Behind the scenes</h2>
+      <div id="behind"></div>
+    </div>
+  </main>
+
+  <div class="phonecol">
+    <div class="phone"><div class="screen" id="screen" aria-live="polite"></div></div>
+    <p class="note" style="text-align:center">Prototype. Ratings are prepared by us with simple rules. Nothing is connected to a real phone.</p>
+  </div>
+</div>
+
+<script>
+var SC=[
+ {id:'S1',app:'Torch Lite',cat:'Flashlight',perm:'contacts',pn:'contacts',data:'contacts',norm:false,label:false,timing:'use',ref:'Deny',
+  reason:'Flashlight apps do not need your contacts.',risk:'Risk: the app could copy the names and numbers of people you know.'},
+ {id:'S2',app:'City Maps',cat:'Maps',perm:'location',pn:'location',data:'location',norm:true,label:true,timing:'use',ref:'Allow while using',
+  reason:'Maps apps need your location to work.',risk:'Risk: low. The app only sees your location while you use it.',
+  wrong:{level:'bad',reason:'This app may not need your location.'}},
+ {id:'S3',app:'ChatNow',cat:'Messaging',perm:'microphone',pn:'microphone',data:'audio',norm:true,label:true,timing:'use',ref:'Allow while using',
+  reason:'Messaging apps use the microphone for voice messages.',risk:'Risk: low. It only listens while you use the app.'},
+ {id:'S4',app:'SnapEdit',cat:'Photo editor',perm:'location',pn:'location',data:'location',norm:false,label:true,timing:'always',ref:'Deny',
+  reason:'This app wants to know where you are all day.',risk:'Risk: the app could track where you go, even when it is closed.'},
+ {id:'S5',app:'Calc Pro',cat:'Calculator',perm:'microphone',pn:'microphone',data:'audio',norm:false,label:false,timing:'use',ref:'Deny',
+  reason:'Calculators do not need a microphone.',risk:'Risk: the app could record sound around you.',
+  wrong:{level:'good',reason:'This looks normal for this app.'}},
+ {id:'S6',app:'VideoHello',cat:'Video call',perm:'camera',pn:'camera',data:'photos and videos',norm:true,label:true,timing:'use',ref:'Allow while using',
+  reason:'Video calls need the camera.',risk:'Risk: low. It only uses the camera while you use the app.'},
+ {id:'X',app:'Puzzle Quest',cat:'Game',perm:'location',pn:'location',data:'location',norm:false,label:true,timing:'use',ref:'Review',extra:true,
+  reason:'Games rarely need your location, but the app says it uses it.',risk:'Risk: medium. It may use your location for ads.'}
+];
+var ASK={contacts:'access your contacts',location:"access this device's location",microphone:'record audio',camera:'take pictures and record video'};
+var st={mode:'pg',detail:'short',wrong:false,sel:'S1',why:false,done:null,toast:null};
+var $=function(id){return document.getElementById(id)};
+function cur(){return SC.filter(function(s){return s.id===st.sel})[0]}
+function concerns(s){return (s.norm?0:1)+(s.label?0:1)+(s.timing==='always'?1:0)}
+function levelOf(n){return n===0?'good':n===1?'warn':'bad'}
+function eff(s){
+  var n=concerns(s),lv=levelOf(n),reason=s.reason,forced=false;
+  if(st.wrong&&s.wrong){lv=s.wrong.level;reason=s.wrong.reason;forced=true}
+  return {n:n,lv:lv,reason:reason,forced:forced};
+}
+var NAME={good:'Expected',warn:'Worth a second look',bad:'Probably unnecessary'};
+var LEVEL={good:'Quiet',warn:'Gentle pause',bad:'Full stop'};
+var ACT={good:'Allow while using',warn:'Review before allowing',bad:'Deny'};
+var ICON={
+ good:'<svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#17703a"/><path d="M6.5 12.5l3.5 3.5 7.5-8" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+ warn:'<svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L23 21H1z" fill="#9a4d00"/><path d="M12 9v6" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="12" cy="18" r="1.5" fill="#fff"/></svg>',
+ bad:'<svg width="34" height="34" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#fff"/><path d="M8 8l8 8M16 8l-8 8" stroke="#b3261e" stroke-width="3" stroke-linecap="round"/></svg>'
+};
+function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+
+function checksHtml(s){
+  var a=s.norm?'<span class="ok">Yes.</span> '+s.cat+' apps usually need '+s.pn+'.':'<span class="no">No.</span> '+s.cat+' apps do not normally need '+s.pn+'.';
+  var b=s.label?'<span class="ok">Yes.</span> The app’s Data safety label lists '+s.data+'.':'<span class="no">No.</span> The app’s Data safety label does not list '+s.data+'.';
+  var c=s.timing==='use'?'<span class="ok">Yes.</span> Access only while you use the app.':'<span class="no">No.</span> Access all the time, even when the app is closed.';
+  return '<div class="why"><p><span>1</span><span><b>Normal for this app type?</b><br>'+a+'</span></p>'+
+   '<p><span>2</span><span><b>Matches what the app says?</b><br>'+b+'</span></p>'+
+   '<p><span>3</span><span><b>Only while in use?</b><br>'+c+'</span></p>'+
+   '<p class="src">A warning is not proof. Source: Google Play Data safety label (prepared by us for this demo).</p></div>';
+}
+function screenHtml(){
+  var s=cur(),e=eff(s);
+  var h='<div class="status"><span>9:41</span><span>●●●</span></div>'+
+   '<div class="app"><div class="appicon" aria-hidden="true">'+s.app.charAt(0)+'</div><p class="appname">'+s.app+'</p><p class="appcat">'+s.cat+' app</p>'+
+   '<div class="ghost" style="width:90%"></div><div class="ghost" style="width:70%"></div><div class="ghost" style="width:80%"></div></div>';
+  if(st.done){
+    h+='<div class="overlay"><div class="dim"></div><div class="result"><p><b>You chose: '+esc(st.done)+'</b></p><p>The app opens. You can change this later in Settings.</p><button class="btn pri" type="button" id="again">Try this scenario again</button></div></div>';
+    return h+(st.toast?'<div class="toast" role="status">'+esc(st.toast)+'</div>':'');
+  }
+  if(st.mode==='regular'){
+    var txt='Allow '+s.app+' to '+ASK[s.perm]+'?';
+    h+='<div class="overlay center"><div class="dim"></div><div class="dialog" role="dialog" aria-label="Permission request"><p>'+txt+'</p><div class="row"><button type="button" data-ch="Don’t allow">Don’t allow</button><button type="button" data-ch="Allow">Allow</button></div></div></div>';
+    return h;
+  }
+  var lv=e.lv, more=st.detail==='more';
+  var cls=lv==='good'?'quiet':lv==='warn'?'pause':'stop';
+  var title=lv==='good'?'This looks normal.':lv==='warn'?'Take a second look.':'We suggest you say no.';
+  var pri;
+  if(lv==='good') pri='<button class="btn pri good" type="button" data-ch="Allow while using">Allow while using</button><button class="btn ter" type="button" data-ch="Deny">Deny</button>';
+  else if(lv==='warn') pri='<button class="btn pri" type="button" id="whyBtn2">Read why first</button><button class="btn sec" type="button" data-ch="Allow while using">Allow while using</button><button class="btn sec" type="button" data-ch="Deny">Deny</button>';
+  else pri='<button class="btn pri danger" type="button" data-ch="Deny">Deny</button><button class="btn ter" type="button" data-ch="Allow while using">Allow anyway</button>';
+  var body='<p class="reason">'+esc(e.reason)+'</p>'+(more&&!e.forced?'<p class="risk">'+esc(s.risk)+'</p>':'')+
+    (lv==='good'?'':'<p class="risk">'+esc(s.app)+' asks for your <b>'+s.pn+'</b>.</p>');
+  var why=(st.why||(lv==='warn'&&false))?checksHtml(s):'';
+  var links='<div class="links"><button class="link" type="button" id="whyBtn">'+(st.why?'Hide why':'Why?')+'</button><button class="link" type="button" id="later">Ask me later</button><button class="link" type="button" id="wrongBtn">This looks wrong</button></div>';
+  if(lv==='good'){
+    h+='<div class="overlay"><div class="sheet quiet"><div class="band">'+ICON.good+'<span>'+title+'</span></div><div class="inner">'+body+(why)+'<div class="btns">'+pri+'</div>'+links+'</div></div></div>';
+  } else if(lv==='warn'){
+    h+='<div class="overlay"><div class="dim"></div><div class="sheet pause"><div class="band">'+ICON.warn+'<span>'+title+'</span></div><div class="inner">'+body+(why)+'<div class="btns">'+pri+'</div>'+links+'</div></div></div>';
+  } else {
+    h+='<div class="overlay"><div class="sheet stop"><div class="band">'+ICON.bad+'<span>'+title+'</span></div><div class="inner">'+body+(why)+'<div class="btns">'+pri+'</div>'+links+'</div></div></div>';
+  }
+  return h+(st.toast?'<div class="toast" role="status">'+esc(st.toast)+'</div>':'');
+}
+function behindHtml(){
+  var s=cur(),e=eff(s);
+  var n=(s.norm?0:1)+' + '+(s.label?0:1)+' + '+(s.timing==='always'?1:0)+' = '+e.n;
+  var h='<dl class="facts"><dt>App type</dt><dd>'+s.cat+'</dd><dt>Permission asked</dt><dd>'+s.pn+'</dd><dt>When it can use it</dt><dd>'+(s.timing==='use'?'Only while the app is open':'All the time (background)')+'</dd><dt>Data safety label lists it?</dt><dd>'+(s.label?'Yes':'No')+'</dd></dl>';
+  h+='<ol class="steps">'+
+   '<li><b>Senses</b><span>The four facts above, and the user setting: <strong>'+(st.detail==='short'?'Short':'More detail')+'</strong>.</span></li>'+
+   '<li><b>Decides</b><span>Concerns (category + label + timing) = <span style="font-family:var(--font-mono)">'+n+'</span>. Interruption level: <span class="pill '+levelOf(e.n)+'">'+LEVEL[levelOf(e.n)]+'</span> ('+NAME[levelOf(e.n)]+').</span></li>'+
+   '<li><b>Shows</b><span>'+(st.mode==='pg'?(e.forced?'<span class="pill '+e.lv+'">'+LEVEL[e.lv]+'</span> This rating is <strong>wrong on purpose</strong> for the study. The Why? panel still shows the true facts.':'One card at the <strong>'+LEVEL[e.lv]+'</strong> level. Suggested action: '+ACT[e.lv]+'.'):'The regular pop-up: two lines and two buttons, no reason.')+'</span></li>'+
+   '<li><b>User control</b><span>Allow, Deny, Ask me later, Why?, This looks wrong. The user can always allow or deny. PermissionGuard never changes a permission by itself.</span></li>'+
+   '<li><b>Reference answer</b><span>'+(s.extra?'Extra demo (orange level). Not part of the study.':'<strong>'+s.ref+'</strong>')+'</span></li></ol>';
+  return h;
+}
+function listHtml(){
+  return SC.map(function(s){
+    var e=eff(s);
+    var col=e.lv==='good'?'var(--good)':e.lv==='warn'?'var(--warn)':'var(--bad)';
+    var shown=st.mode==='pg'?'background:'+col+';border-color:'+col:'';
+    var tag=s.extra?'<span class="tag">extra demo</span>':(st.wrong&&s.wrong?'<span class="tag wrongtag">wrong on purpose</span>':'');
+    return '<button type="button" data-sc="'+s.id+'" aria-pressed="'+(s.id===st.sel)+'"><span class="id">'+(s.extra?'+':s.id)+'</span><span class="dot" style="'+shown+'"></span><span>'+s.app+' ('+s.cat.toLowerCase()+') asks for <b>'+s.pn+'</b>'+(s.timing==='always'?', all the time':'')+'</span>'+tag+'</button>';
+  }).join('');
+}
+function draw(){
+  $('screen').innerHTML=screenHtml();
+  $('behind').innerHTML=behindHtml();
+  $('scnList').innerHTML=listHtml();
+  Array.prototype.forEach.call(document.querySelectorAll('#modeSeg button'),function(b){b.setAttribute('aria-pressed',String(b.dataset.mode===st.mode))});
+  Array.prototype.forEach.call(document.querySelectorAll('#detailSeg button'),function(b){b.setAttribute('aria-pressed',String(b.dataset.detail===st.detail))});
+}
+function reset(){st.why=false;st.done=null;st.toast=null}
+document.addEventListener('click',function(ev){
+  var t=ev.target.closest('button');if(!t)return;
+  if(t.dataset.sc){st.sel=t.dataset.sc;reset();draw();return}
+  if(t.dataset.mode){st.mode=t.dataset.mode;reset();draw();return}
+  if(t.dataset.detail){st.detail=t.dataset.detail;draw();return}
+  if(t.dataset.ch){st.done=t.dataset.ch;st.toast=null;draw();return}
+  if(t.id==='whyBtn'||t.id==='whyBtn2'){st.why=!st.why||t.id==='whyBtn2';st.toast=null;draw();return}
+  if(t.id==='later'){st.done='Ask me later';draw();return}
+  if(t.id==='wrongBtn'){st.toast='Thanks. We noted it. You can still choose.';draw();return}
+  if(t.id==='again'){reset();draw();return}
+});
+$('wrongToggle').addEventListener('change',function(e){st.wrong=e.target.checked;reset();draw()});
+draw();
+</script>
